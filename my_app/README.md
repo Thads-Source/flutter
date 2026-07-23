@@ -1,17 +1,20 @@
 # Kitchen Inventory
 
-Back-of-house inventory tracking for a restaurant, with three roles:
-
-| Role | What they can do |
-| --- | --- |
-| **Kitchen** | See the inventory, adjust counts with big +/− buttons, set exact counts |
-| **Manager** | Everything above, plus add/edit/delete items, set "should have" amounts, see the Overview |
-| **Owner** | Same as Manager |
+Back-of-house inventory tracking for a restaurant. Only four accounts can
+exist — **one owner and up to three managers** — and nobody else can sign
+up: once the owner spot or all three manager spots are taken, new sign-ups
+are politely refused. Everyone with an account has full access: counting
+stock, adding/editing/removing items, the Overview, and the History.
 
 Every item has a **"should have" amount** — how much you want on hand.
 Anything under that gets a red "Low" badge in the list, and the **Overview**
 tab turns those into a ready-made shopping list showing exactly how much to
 order.
+
+Every item also shows **who counted it last and when** ("Counted by sam ·
+today 2:15 PM"), and the **History** tab — visible to everyone — keeps a
+running log of every change: counts, added items, edits, and removals, each
+stamped with who did it. The log keeps the most recent 200 changes.
 
 The whole app follows two design rules:
 
@@ -42,7 +45,8 @@ flutter test
 ## Login & accounts
 
 The app opens with a sign-in / create-account screen; you pick your role
-(Kitchen / Manager / Owner) when creating an account. Accounts are stored on
+(Manager / Owner) when creating an account, and the app enforces the limit
+of one owner and three managers. Accounts are stored on
 the device itself: passwords are never saved — each account keeps a random
 salt plus a SHA-256 hash, and signing in re-hashes what you typed and
 compares. Sessions survive app restarts; sign out from the top-right button.
@@ -59,9 +63,10 @@ rest of the app only talks to those two files.
 - `lib/theme.dart` — the design system: colors, text sizes, minimum button
   sizes. Change the `seedColor` to instantly re-color the app.
 - `lib/models/inventory_item.dart` — what an inventory item is (name,
-  category, unit, count, and the "should have" amount).
-- `lib/inventory/inventory_store.dart` — saving/loading the inventory, plus
-  the starter items seeded on first launch.
+  category, unit, count, the "should have" amount, and who counted it last).
+- `lib/models/history_entry.dart` — one line of the change log.
+- `lib/inventory/inventory_store.dart` — saving/loading the inventory and
+  history, plus the starter items seeded on first launch.
 - `lib/screens/inventory_home_screen.dart` — the inventory list, the
   Overview/shopping list, and the add/edit sheet.
 - `lib/screens/login_screen.dart` — sign-in / create-account with the role

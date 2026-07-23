@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _creatingAccount = false;
   bool _obscurePassword = true;
   bool _busy = false;
-  UserRole _role = UserRole.kitchen;
+  UserRole _role = UserRole.manager;
   String? _errorMessage;
 
   @override
@@ -154,10 +154,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       SegmentedButton<UserRole>(
                         segments: const <ButtonSegment<UserRole>>[
                           ButtonSegment<UserRole>(
-                            value: UserRole.kitchen,
-                            label: Text('Kitchen'),
-                          ),
-                          ButtonSegment<UserRole>(
                             value: UserRole.manager,
                             label: Text('Manager'),
                           ),
@@ -172,8 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Kitchen staff update counts. Managers and owners '
-                        'can also add and edit items and see the overview.',
+                        'Only 4 accounts can exist: 3 managers and 1 owner.',
                         style: text.bodyMedium!.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),

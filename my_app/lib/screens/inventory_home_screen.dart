@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_service.dart';
 import '../inventory/inventory_store.dart';
+import '../models/history_entry.dart';
 import '../models/inventory_item.dart';
+
+enum _Tab { inventory, overview, history }
 
 /// The main screen after signing in.
 ///
-/// Kitchen staff see the inventory list and update counts with big +/-
-/// buttons. Managers and owners additionally get an Overview tab (stock
-/// stats and a shopping list of everything below par) and can add, edit,
-/// and delete items.
+/// Only managers and the owner have accounts, so everyone gets full
+/// access: the inventory list with count steppers, add/edit/delete via a
+/// bottom sheet, an Overview tab (stock stats plus a shopping list of
+/// everything running low), and the History tab of all changes.
 class InventoryHomeScreen extends StatefulWidget {
   const InventoryHomeScreen({
     super.key,
@@ -29,9 +32,16 @@ class InventoryHomeScreen extends StatefulWidget {
 class _InventoryHomeScreenState extends State<InventoryHomeScreen> {
   final InventoryStore _store = InventoryStore();
   List<InventoryItem>? _items;
-  int _tab = 0;
+  List<HistoryEntry>? _history;
+  int _tabIndex = 0;
 
-  bool get _canManage => widget.user.role.canManageItems;
+  static const List<_Tab> _tabs = <_Tab>[
+    _Tab.inventory,
+    _Tab.overview,
+    _Tab.history,
+  ];
+
+  _Tab get _currentTab => _tabs[_tabIndex];
 
   @override
   void initState() {
@@ -41,10 +51,52 @@ class _InventoryHomeScreenState extends State<InventoryHomeScreen> {
 
   Future<void> _load() async {
     final List<InventoryItem> items = await _store.load();
+    final List<HistoryEntry> history = await _store.loadHistory();
     if (!mounted) {
       return;
     }
-    setState(() => _items = items);
+    setState(() {
+      _items = items;
+      _history = history;
+    });
+  }
+
+  /// Records one line of history (newest first) and persists it.
+  Future<void> _log(String message) async {
+    setState(() {
+      _history!.insert(
+        0,
+        HistoryEntry(
+          at: DateTime.now(),
+          by: widget.user.email,
+          message: message,
+        ),
+      );
+      if (_history!.length > InventoryStore.maxHistoryEntries) {
+        _history!.removeRange(
+          InventoryStore.maxHistoryEntries,
+          _history!.length,
+        );
+      }
+    });
+    await _store.saveHistory(_history!);
+  }
+
+  Future<void> _adjustCount(InventoryItem item, double delta) async {
+    final double before = item.quantity;
+    final double after = max(0, before + delta);
+    if (after == before) {
+      return;
+    }
+    await _apply(() {
+      item.quantity = after;
+      item.lastCountedBy = widget.user.email;
+      item.lastCountedAt = DateTime.now();
+    });
+    await _log(
+      '${item.name}: count ${formatQuantity(before)} → '
+      '${formatQuantity(after)}',
+    );
   }
 
   /// Applies a change to the item list, refreshes the UI, and persists.
@@ -57,36 +109,83 @@ class _InventoryHomeScreenState extends State<InventoryHomeScreen> {
     final _ItemSheetResult? result = await showModalBottomSheet<_ItemSheetResult>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ItemSheet(item: item, canManage: _canManage),
+      builder: (_) => _ItemSheet(item: item),
     );
     if (result == null) {
       return;
     }
+    if (result.delete) {
+      await _apply(
+        () => _items!.removeWhere((InventoryItem i) => i.id == item!.id),
+      );
+      await _log('Removed ${item!.name}');
+      return;
+    }
+    final InventoryItem updated = result.item!;
+    if (item == null) {
+      updated.lastCountedBy = widget.user.email;
+      updated.lastCountedAt = DateTime.now();
+      await _apply(() => _items!.add(updated));
+      await _log(
+        'Added ${updated.name} '
+        '(${formatQuantity(updated.quantity)} ${updated.unit})',
+      );
+      return;
+    }
+    final bool countChanged = updated.quantity != item.quantity;
+    final bool detailsChanged = updated.name != item.name ||
+        updated.category != item.category ||
+        updated.unit != item.unit ||
+        updated.par != item.par;
+    if (countChanged) {
+      updated.lastCountedBy = widget.user.email;
+      updated.lastCountedAt = DateTime.now();
+    }
     await _apply(() {
-      if (result.delete) {
-        _items!.removeWhere((InventoryItem i) => i.id == item!.id);
-      } else if (item == null) {
-        _items!.add(result.item!);
-      } else {
-        final int index =
-            _items!.indexWhere((InventoryItem i) => i.id == item.id);
-        _items![index] = result.item!;
-      }
+      final int index =
+          _items!.indexWhere((InventoryItem i) => i.id == item.id);
+      _items![index] = updated;
     });
+    if (countChanged) {
+      await _log(
+        '${updated.name}: count ${formatQuantity(item.quantity)} → '
+        '${formatQuantity(updated.quantity)}',
+      );
+    }
+    if (detailsChanged) {
+      await _log('Updated ${updated.name} details');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final List<InventoryItem>? items = _items;
-    if (items == null) {
+    final List<HistoryEntry>? history = _history;
+    if (items == null || history == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
+    final String title = switch (_currentTab) {
+      _Tab.inventory => 'Inventory',
+      _Tab.overview => 'Overview',
+      _Tab.history => 'History',
+    };
+    final Widget body = switch (_currentTab) {
+      _Tab.inventory => _InventoryList(
+          items: items,
+          user: widget.user,
+          onAdjust: _adjustCount,
+          onOpen: (InventoryItem item) => _openItemSheet(item: item),
+        ),
+      _Tab.overview => _OverviewTab(items: items),
+      _Tab.history => _HistoryTab(entries: history),
+    };
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tab == 0 ? 'Inventory' : 'Overview'),
+        title: Text(title),
         actions: <Widget>[
           IconButton(
             tooltip: 'Sign out',
@@ -95,37 +194,34 @@ class _InventoryHomeScreenState extends State<InventoryHomeScreen> {
           ),
         ],
       ),
-      body: _tab == 0
-          ? _InventoryList(
-              items: items,
-              user: widget.user,
-              onAdjust: (InventoryItem item, double delta) => _apply(
-                () => item.quantity = max(0, item.quantity + delta),
-              ),
-              onOpen: (InventoryItem item) => _openItemSheet(item: item),
-            )
-          : _OverviewTab(items: items),
-      bottomNavigationBar: _canManage
-          ? NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (int index) =>
-                  setState(() => _tab = index),
-              destinations: const <NavigationDestination>[
-                NavigationDestination(
+      body: body,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (int index) =>
+            setState(() => _tabIndex = index),
+        destinations: <NavigationDestination>[
+          for (final _Tab tab in _tabs)
+            switch (tab) {
+              _Tab.inventory => const NavigationDestination(
                   icon: Icon(Icons.inventory_2_outlined),
                   selectedIcon: Icon(Icons.inventory_2),
                   label: 'Inventory',
                 ),
-                NavigationDestination(
+              _Tab.overview => const NavigationDestination(
                   icon: Icon(Icons.insights_outlined),
                   selectedIcon: Icon(Icons.insights),
                   label: 'Overview',
                 ),
-              ],
-            )
-          : null,
+              _Tab.history => const NavigationDestination(
+                  icon: Icon(Icons.history_outlined),
+                  selectedIcon: Icon(Icons.history),
+                  label: 'History',
+                ),
+            },
+        ],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _tab == 0 && _canManage
+      floatingActionButton: _currentTab == _Tab.inventory
           ? FilledButton.icon(
               onPressed: () => _openItemSheet(),
               icon: const Icon(Icons.add),
@@ -259,6 +355,17 @@ class _ItemCard extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
+                    if (item.lastCountedBy != null) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Counted by ${shortEmailName(item.lastCountedBy!)} '
+                        '· ${formatWhen(item.lastCountedAt!)}',
+                        style: text.bodyMedium!.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -358,6 +465,59 @@ class _OverviewTab extends StatelessWidget {
   }
 }
 
+/// Every change, newest first: counts, added/edited/removed items.
+class _HistoryTab extends StatelessWidget {
+  const _HistoryTab({required this.entries});
+
+  final List<HistoryEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
+
+    if (entries.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'No changes yet.\nCounts and edits will show up here.',
+            textAlign: TextAlign.center,
+            style: text.bodyLarge!.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      children: <Widget>[
+        for (final HistoryEntry entry in entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(entry.message, style: text.bodyLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${shortEmailName(entry.by)} · ${formatWhen(entry.at)}',
+                      style: text.bodyMedium!.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.label,
@@ -409,13 +569,11 @@ class _ItemSheetResult {
   final bool delete;
 }
 
-/// Bottom sheet for adding/editing an item (managers and owners) or just
-/// updating its count (kitchen staff).
+/// Bottom sheet for adding or editing an item.
 class _ItemSheet extends StatefulWidget {
-  const _ItemSheet({required this.item, required this.canManage});
+  const _ItemSheet({required this.item});
 
   final InventoryItem? item;
-  final bool canManage;
 
   @override
   State<_ItemSheet> createState() => _ItemSheetState();
@@ -457,13 +615,13 @@ class _ItemSheetState extends State<_ItemSheet> {
     final InventoryItem item = InventoryItem(
       id: original?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      name: widget.canManage ? _name.text.trim() : original!.name,
-      category: widget.canManage ? _category : original!.category,
-      unit: widget.canManage
-          ? (unit.isEmpty ? 'each' : unit)
-          : original!.unit,
+      name: _name.text.trim(),
+      category: _category,
+      unit: unit.isEmpty ? 'each' : unit,
       quantity: max(0, quantity),
-      par: widget.canManage ? max(0, par) : original!.par,
+      par: max(0, par),
+      lastCountedBy: original?.lastCountedBy,
+      lastCountedAt: original?.lastCountedAt,
     );
     Navigator.of(context).pop(_ItemSheetResult.save(item));
   }
@@ -472,14 +630,7 @@ class _ItemSheetState extends State<_ItemSheet> {
   Widget build(BuildContext context) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
-    final String title;
-    if (widget.item == null) {
-      title = 'Add item';
-    } else if (widget.canManage) {
-      title = 'Edit item';
-    } else {
-      title = 'Update count';
-    }
+    final String title = widget.item == null ? 'Add item' : 'Edit item';
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -496,54 +647,50 @@ class _ItemSheetState extends State<_ItemSheet> {
           children: <Widget>[
             Text(title, style: text.titleLarge),
             const SizedBox(height: 16),
-            if (widget.canManage) ...<Widget>[
-              TextFormField(
-                key: const Key('name-field'),
-                controller: _name,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (String? value) =>
-                    (value ?? '').trim().isEmpty ? 'Give the item a name.' : null,
+            TextFormField(
+              key: const Key('name-field'),
+              controller: _name,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const Key('category-field'),
-                initialValue: _category,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                ),
-                items: <DropdownMenuItem<String>>[
-                  for (final String category in kInventoryCategories)
-                    DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(category),
-                    ),
-                ],
-                onChanged: (String? value) =>
-                    setState(() => _category = value ?? _category),
+              validator: (String? value) =>
+                  (value ?? '').trim().isEmpty ? 'Give the item a name.' : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: const Key('category-field'),
+              initialValue: _category,
+              decoration: const InputDecoration(
+                labelText: 'Category',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-            ],
+              items: <DropdownMenuItem<String>>[
+                for (final String category in kInventoryCategories)
+                  DropdownMenuItem<String>(
+                    value: category,
+                    child: Text(category),
+                  ),
+              ],
+              onChanged: (String? value) =>
+                  setState(() => _category = value ?? _category),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: <Widget>[
-                if (widget.canManage) ...<Widget>[
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('unit-field'),
-                      controller: _unit,
-                      decoration: const InputDecoration(
-                        labelText: 'Unit',
-                        hintText: 'lbs',
-                        border: OutlineInputBorder(),
-                      ),
+                Expanded(
+                  child: TextFormField(
+                    key: const Key('unit-field'),
+                    controller: _unit,
+                    decoration: const InputDecoration(
+                      labelText: 'Unit',
+                      hintText: 'lbs',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                ],
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     key: const Key('qty-field'),
@@ -557,22 +704,20 @@ class _ItemSheetState extends State<_ItemSheet> {
                     ),
                   ),
                 ),
-                if (widget.canManage) ...<Widget>[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('par-field'),
-                      controller: _par,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Should have',
-                        border: OutlineInputBorder(),
-                      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    key: const Key('par-field'),
+                    controller: _par,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Should have',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                ],
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -581,7 +726,7 @@ class _ItemSheetState extends State<_ItemSheet> {
               onPressed: _save,
               child: const Text('Save'),
             ),
-            if (widget.canManage && widget.item != null) ...<Widget>[
+            if (widget.item != null) ...<Widget>[
               const SizedBox(height: 8),
               TextButton(
                 style: TextButton.styleFrom(foregroundColor: scheme.error),

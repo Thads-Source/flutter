@@ -2,12 +2,18 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/history_entry.dart';
 import '../models/inventory_item.dart';
 
-/// Loads and saves the inventory list from device storage. First launch
-/// seeds a realistic starter inventory so the app is usable immediately.
+/// Loads and saves the inventory list and change history from device
+/// storage. First launch seeds a realistic starter inventory so the app is
+/// usable immediately.
 class InventoryStore {
   static const String _itemsKey = 'inventory_items';
+  static const String _historyKey = 'inventory_history';
+
+  /// The history is capped so storage never grows without bound.
+  static const int maxHistoryEntries = 200;
 
   Future<List<InventoryItem>> load() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -27,6 +33,30 @@ class InventoryStore {
     await prefs.setString(
       _itemsKey,
       jsonEncode(items.map((InventoryItem i) => i.toJson()).toList()),
+    );
+  }
+
+  Future<List<HistoryEntry>> loadHistory() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? raw = prefs.getString(_historyKey);
+    if (raw == null) {
+      return <HistoryEntry>[];
+    }
+    return (jsonDecode(raw) as List<dynamic>)
+        .map((dynamic e) => HistoryEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> saveHistory(List<HistoryEntry> entries) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _historyKey,
+      jsonEncode(
+        entries
+            .take(maxHistoryEntries)
+            .map((HistoryEntry e) => e.toJson())
+            .toList(),
+      ),
     );
   }
 

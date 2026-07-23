@@ -10,6 +10,8 @@ class InventoryItem {
     required this.unit,
     required this.quantity,
     required this.par,
+    this.lastCountedBy,
+    this.lastCountedAt,
   });
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) => InventoryItem(
@@ -19,6 +21,10 @@ class InventoryItem {
         unit: json['unit'] as String,
         quantity: (json['quantity'] as num).toDouble(),
         par: (json['par'] as num).toDouble(),
+        lastCountedBy: json['lastCountedBy'] as String?,
+        lastCountedAt: json['lastCountedAt'] == null
+            ? null
+            : DateTime.parse(json['lastCountedAt'] as String),
       );
 
   final String id;
@@ -27,6 +33,8 @@ class InventoryItem {
   String unit;
   double quantity;
   double par;
+  String? lastCountedBy;
+  DateTime? lastCountedAt;
 
   bool get isLow => quantity < par;
 
@@ -37,6 +45,8 @@ class InventoryItem {
         'unit': unit,
         'quantity': quantity,
         'par': par,
+        'lastCountedBy': lastCountedBy,
+        'lastCountedAt': lastCountedAt?.toIso8601String(),
       };
 }
 
@@ -52,3 +62,30 @@ const List<String> kInventoryCategories = <String>[
 String formatQuantity(double value) => value == value.roundToDouble()
     ? value.toInt().toString()
     : value.toStringAsFixed(1);
+
+/// "sam" from "sam@example.com" — short enough to fit on an item card.
+String shortEmailName(String email) => email.split('@').first;
+
+/// "today 2:15 PM", "yesterday 8:40 AM", or "Jul 21" for older dates.
+String formatWhen(DateTime when) {
+  const List<String> months = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final DateTime now = DateTime.now();
+  final DateTime today = DateTime(now.year, now.month, now.day);
+  final DateTime day = DateTime(when.year, when.month, when.day);
+  if (day == today) {
+    return 'today ${_timeOfDay(when)}';
+  }
+  if (day == today.subtract(const Duration(days: 1))) {
+    return 'yesterday ${_timeOfDay(when)}';
+  }
+  return '${months[when.month - 1]} ${when.day}';
+}
+
+String _timeOfDay(DateTime t) {
+  final int hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
+  final String minutes = t.minute.toString().padLeft(2, '0');
+  return '$hour:$minutes ${t.hour < 12 ? 'AM' : 'PM'}';
+}

@@ -4,19 +4,15 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Who can do what in the app.
-enum UserRole { kitchen, manager, owner }
+/// Who can hold an account. The app allows exactly one owner and up to
+/// three managers — nobody else can sign up.
+enum UserRole { manager, owner }
 
 extension UserRoleLabel on UserRole {
   String get label => switch (this) {
-        UserRole.kitchen => 'Kitchen',
         UserRole.manager => 'Manager',
         UserRole.owner => 'Owner',
       };
-
-  /// Kitchen staff update counts; managers and owners can also add, edit,
-  /// and delete items and see the overview/shopping list.
-  bool get canManageItems => this != UserRole.kitchen;
 }
 
 /// The signed-in user.
@@ -68,7 +64,7 @@ class AuthService {
     }
     final UserRole role = UserRole.values.firstWhere(
       (UserRole r) => r.name == record['role'],
-      orElse: () => UserRole.kitchen,
+      orElse: () => UserRole.manager,
     );
     return AppUser(email: email, role: role);
   }
@@ -84,6 +80,27 @@ class AuthService {
     if (users.containsKey(key)) {
       return const AuthResult.error(
         'An account with that email already exists. Try signing in instead.',
+      );
+    }
+    int owners = 0;
+    int managers = 0;
+    for (final dynamic record in users.values) {
+      final String? existing =
+          (record as Map<String, dynamic>)['role'] as String?;
+      if (existing == UserRole.owner.name) {
+        owners++;
+      } else {
+        managers++;
+      }
+    }
+    if (role == UserRole.owner && owners >= 1) {
+      return const AuthResult.error(
+        'This app already has an owner account.',
+      );
+    }
+    if (role == UserRole.manager && managers >= 3) {
+      return const AuthResult.error(
+        'All three manager spots are taken.',
       );
     }
     final String salt = _newSalt();
