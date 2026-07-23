@@ -1,3 +1,7 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 import 'package:flutter/material.dart';
 
 import '../auth/auth_service.dart';
@@ -90,8 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _creatingAccount
-                          ? 'One quick step and your tasks are yours.'
-                          : 'Sign in to see your tasks.',
+                          ? "One quick step and you're in."
+                          : 'Sign in to see your inventory.',
                       style: text.bodyMedium!.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),

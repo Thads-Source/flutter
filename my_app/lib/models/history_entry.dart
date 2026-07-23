@@ -1,3 +1,7 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 /// One line in the change history: who did what, and when.
 class HistoryEntry {
   HistoryEntry({required this.at, required this.by, required this.message});

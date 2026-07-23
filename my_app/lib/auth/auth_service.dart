@@ -1,3 +1,7 @@
+// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 import 'dart:convert';
 import 'dart:math';
 
@@ -43,8 +47,8 @@ class AuthResult {
 /// re-hashes the entered password and compares. This is honest security for
 /// a single-device app; for accounts that work across devices, swap this
 /// class for a backed service (e.g. Firebase Auth) — the rest of the app
-/// only talks to this interface. Note that in a hosted setup, roles should
-/// be assigned by the owner/manager server-side, not chosen at sign-up.
+/// only talks to this interface. In a hosted setup, roles should be assigned
+/// by the owner server-side rather than chosen at sign-up.
 class AuthService {
   static const String _usersKey = 'auth_users';
   static const String _sessionKey = 'auth_session_email';
