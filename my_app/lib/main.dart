@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auth/auth_service.dart';
-import 'screens/home_screen.dart';
+import 'screens/inventory_home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme.dart';
 
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'My App',
+      title: 'Kitchen Inventory',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
 }
 
 /// Restores any saved session on launch, then shows either the login screen
-/// or the home screen. Sessions persist across app restarts.
+/// or the inventory. Sessions persist across app restarts.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -35,7 +35,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final AuthService _auth = AuthService();
-  String? _email;
+  AppUser? _user;
   bool _restoring = true;
 
   @override
@@ -45,12 +45,12 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _restoreSession() async {
-    final String? email = await _auth.currentUserEmail();
+    final AppUser? user = await _auth.currentUser();
     if (!mounted) {
       return;
     }
     setState(() {
-      _email = email;
+      _user = user;
       _restoring = false;
     });
   }
@@ -60,7 +60,7 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) {
       return;
     }
-    setState(() => _email = null);
+    setState(() => _user = null);
   }
 
   @override
@@ -70,12 +70,10 @@ class _AuthGateState extends State<AuthGate> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    if (_email == null) {
-      return LoginScreen(
-        auth: _auth,
-        onSignedIn: (String email) => setState(() => _email = email),
-      );
+    final AppUser? user = _user;
+    if (user == null) {
+      return LoginScreen(auth: _auth, onSignedIn: _restoreSession);
     }
-    return HomeScreen(userEmail: _email!, onSignOut: _signOut);
+    return InventoryHomeScreen(user: user, onSignOut: _signOut);
   }
 }

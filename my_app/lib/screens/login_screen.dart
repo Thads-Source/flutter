@@ -10,7 +10,7 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.auth, required this.onSignedIn});
 
   final AuthService auth;
-  final ValueChanged<String> onSignedIn;
+  final VoidCallback onSignedIn;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _creatingAccount = false;
   bool _obscurePassword = true;
   bool _busy = false;
+  UserRole _role = UserRole.kitchen;
   String? _errorMessage;
 
   @override
@@ -43,13 +44,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     final String email = _email.text.trim();
     final AuthResult result = _creatingAccount
-        ? await widget.auth.signUp(email, _password.text)
+        ? await widget.auth.signUp(email, _password.text, _role)
         : await widget.auth.signIn(email, _password.text);
     if (!mounted) {
       return;
     }
     if (result.ok) {
-      widget.onSignedIn(email.toLowerCase());
+      widget.onSignedIn();
     } else {
       setState(() {
         _busy = false;
@@ -146,6 +147,38 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
+                    if (_creatingAccount) ...<Widget>[
+                      const SizedBox(height: 20),
+                      Text('Your role', style: text.titleMedium),
+                      const SizedBox(height: 8),
+                      SegmentedButton<UserRole>(
+                        segments: const <ButtonSegment<UserRole>>[
+                          ButtonSegment<UserRole>(
+                            value: UserRole.kitchen,
+                            label: Text('Kitchen'),
+                          ),
+                          ButtonSegment<UserRole>(
+                            value: UserRole.manager,
+                            label: Text('Manager'),
+                          ),
+                          ButtonSegment<UserRole>(
+                            value: UserRole.owner,
+                            label: Text('Owner'),
+                          ),
+                        ],
+                        selected: <UserRole>{_role},
+                        onSelectionChanged: (Set<UserRole> selection) =>
+                            setState(() => _role = selection.first),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Kitchen staff update counts. Managers and owners '
+                        'can also add and edit items and see the overview.',
+                        style: text.bodyMedium!.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     if (_errorMessage != null)
                       Container(
                         margin: const EdgeInsets.only(top: 16),
