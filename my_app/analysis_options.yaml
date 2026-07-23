@@ -1,0 +1,8 @@
+# Standalone analysis options for this app, so the Flutter SDK repository's
+# internal lint rules (in the repository root) don't apply here.
+linter:
+  rules:
+    - prefer_const_constructors
+    - prefer_final_locals
+    - avoid_print
+    - use_key_in_widget_constructors
