@@ -58,12 +58,12 @@ void main() {
     expect(find.text('Overview'), findsNothing);
   });
 
-  testWidgets('items below par show a Low badge', (WidgetTester tester) async {
+  testWidgets('items running low show a Low badge', (WidgetTester tester) async {
     await createAccount(tester);
 
-    // Seed data has three items below par: ground beef, onions, butter.
+    // Seed data has three items running low: ground beef, onions, butter.
     expect(find.text('Low'), findsNWidgets(3));
-    expect(find.text('3 items below par'), findsOneWidget);
+    expect(find.text('3 items running low'), findsOneWidget);
   });
 
   testWidgets('plus button increments a count and persists it', (WidgetTester tester) async {
@@ -81,14 +81,14 @@ void main() {
     expect(inButterCard('3'), findsOneWidget);
   });
 
-  testWidgets('overview lists everything below par as a shopping list', (WidgetTester tester) async {
+  testWidgets('overview lists everything running low as a shopping list', (WidgetTester tester) async {
     await createAccount(tester);
 
     await tester.tap(find.text('Overview'));
     await tester.pumpAndSettle();
 
     expect(find.text('Shopping list'), findsOneWidget);
-    expect(find.text('Below par'), findsOneWidget);
+    expect(find.text('Running low'), findsOneWidget);
     expect(find.text('Ground beef'), findsOneWidget);
     expect(find.text('Onions'), findsOneWidget);
     expect(find.text('Butter'), findsOneWidget);

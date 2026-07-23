@@ -5,12 +5,13 @@ Back-of-house inventory tracking for a restaurant, with three roles:
 | Role | What they can do |
 | --- | --- |
 | **Kitchen** | See the inventory, adjust counts with big +/− buttons, set exact counts |
-| **Manager** | Everything above, plus add/edit/delete items, set par levels, see the Overview |
+| **Manager** | Everything above, plus add/edit/delete items, set "should have" amounts, see the Overview |
 | **Owner** | Same as Manager |
 
-Items have a **par level** (the amount you never want to drop below). Anything
-under par gets a red "Low" badge in the list, and the **Overview** tab turns
-those into a ready-made shopping list showing exactly how much to order.
+Every item has a **"should have" amount** — how much you want on hand.
+Anything under that gets a red "Low" badge in the list, and the **Overview**
+tab turns those into a ready-made shopping list showing exactly how much to
+order.
 
 The whole app follows two design rules:
 
@@ -58,7 +59,7 @@ rest of the app only talks to those two files.
 - `lib/theme.dart` — the design system: colors, text sizes, minimum button
   sizes. Change the `seedColor` to instantly re-color the app.
 - `lib/models/inventory_item.dart` — what an inventory item is (name,
-  category, unit, count, par).
+  category, unit, count, and the "should have" amount).
 - `lib/inventory/inventory_store.dart` — saving/loading the inventory, plus
   the starter items seeded on first launch.
 - `lib/screens/inventory_home_screen.dart` — the inventory list, the

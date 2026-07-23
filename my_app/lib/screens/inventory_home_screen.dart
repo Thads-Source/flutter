@@ -166,7 +166,7 @@ class _InventoryList extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '$lowCount item${lowCount == 1 ? '' : 's'} below par',
+              '$lowCount item${lowCount == 1 ? '' : 's'} running low',
               style: text.titleMedium!.copyWith(color: scheme.error),
             ),
           ),
@@ -254,7 +254,7 @@ class _ItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${item.unit} · par ${formatQuantity(item.par)}',
+                      '${item.unit} · should have ${formatQuantity(item.par)}',
                       style: text.bodyMedium!.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -314,7 +314,7 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _StatCard(
-                label: 'Below par',
+                label: 'Running low',
                 value: '${lowItems.length}',
                 highlight: lowItems.isNotEmpty,
               ),
@@ -326,7 +326,7 @@ class _OverviewTab extends StatelessWidget {
         const SizedBox(height: 12),
         if (lowItems.isEmpty)
           Text(
-            'Everything is at or above par. Nothing to order.',
+            'Everything is fully stocked. Nothing to order.',
             style: text.bodyLarge,
           )
         else
@@ -343,8 +343,7 @@ class _OverviewTab extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Have ${formatQuantity(item.quantity)} ${item.unit} · '
-                        'need ${formatQuantity(item.par - item.quantity)} more '
-                        'to reach par',
+                        'need ${formatQuantity(item.par - item.quantity)} more',
                         style: text.bodyMedium!.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -568,7 +567,7 @@ class _ItemSheetState extends State<_ItemSheet> {
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
-                        labelText: 'Par',
+                        labelText: 'Should have',
                         border: OutlineInputBorder(),
                       ),
                     ),
