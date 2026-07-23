@@ -26,12 +26,29 @@ To run the tests:
 flutter test
 ```
 
+## Login & accounts
+
+The app opens with a sign-in / create-account screen. Accounts are stored on
+the device itself: passwords are never saved — each account keeps a random
+salt plus a SHA-256 hash, and signing in re-hashes what you typed and
+compares. Your session survives app restarts; the sign-out button is in the
+top-right of the home screen.
+
+Because accounts live on the device, they don't sync between phones. When
+you're ready for real cross-device accounts, swap `lib/auth/auth_service.dart`
+for a hosted service (Firebase Auth is the usual choice) — the rest of the
+app only talks to that one file, so nothing else needs to change.
+
 ## Where the design decisions live
 
 - `lib/theme.dart` — the whole design system: colors, text sizes, minimum
   button sizes. Change the `seedColor` there to instantly re-color the app.
 - `lib/screens/home_screen.dart` — the home screen, showing the patterns in
   practice (big tap targets, bottom-anchored primary action, clear hierarchy).
+- `lib/screens/login_screen.dart` — the sign-in / create-account form, with
+  inline validation and plain-language error messages.
+- `lib/auth/auth_service.dart` — account storage and password hashing; the
+  single file to replace when moving to a hosted auth service.
 
 ## Do you need another AI or an app builder?
 

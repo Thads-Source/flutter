@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 /// Home screen: a simple task list that demonstrates the app's two design
 /// goals — readable text and large, forgiving tap targets.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    required this.userEmail,
+    required this.onSignOut,
+  });
+
+  final String userEmail;
+  final VoidCallback onSignOut;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -44,17 +51,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final int remaining = _tasks.where((_Task t) => !t.done).length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Today')),
+      appBar: AppBar(
+        title: const Text('Today'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: widget.onSignOut,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               remaining == 0
                   ? 'All done. Nice work!'
                   : '$remaining thing${remaining == 1 ? '' : 's'} left to do',
               style: text.headlineMedium,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'Signed in as ${widget.userEmail}',
+              style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
           for (final _Task task in _tasks)
