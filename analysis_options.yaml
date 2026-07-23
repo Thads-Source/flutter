@@ -35,6 +35,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+      # Standalone example app with its own pub dependencies and
+      # analysis_options.yaml; analyzed on its own, not as part of the SDK.
+    - my_app/**
 
 formatter:
   page_width: 100
