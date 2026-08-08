@@ -15,6 +15,7 @@ import sys
 import test_tennis_signal
 import test_baseball_signal
 import test_live_monitor
+import test_odds_feed
 
 from tennis_signal import TennisLiveSignal
 from baseball_signal import PlateAppearanceSignal
@@ -89,6 +90,8 @@ def main():
     total += test_baseball_signal._run_all()
     print("\n=== live_monitor ===")
     total += test_live_monitor._run_all()
+    print("\n=== odds_feed ===")
+    total += test_odds_feed._run_all()
     print("\n=== integration ===")
     total += integration_devig_kelly()
 

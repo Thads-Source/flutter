@@ -13,6 +13,8 @@ recompute on every new tick (point, pitch, or odds change) — no state reload.
 | `tennis_signal.py` | Point-by-point Markov win probability + `TennisLiveSignal`. |
 | `baseball_signal.py` | Per-plate-appearance logistic P(single) + `PlateAppearanceSignal`. |
 | `live_monitor.py` | Generic, sport-agnostic polling loop. |
+| `odds_feed.py` | Pull DraftKings lines via The Odds API + push phone alerts (ntfy). Stdlib only. |
+| `monitor_tennis_live.py` | End-to-end example: DK tennis odds → model → phone push on a fired edge. |
 
 ## Running
 
@@ -55,11 +57,47 @@ prior coefficients so it runs out of the box** with no training data. Call
 `PlateAppearanceSignal.train_from_csv(path)` to **replace** those priors with
 coefficients fit to real PA-level Statcast/Retrosheet data.
 
+## Connecting a live odds feed (DraftKings via The Odds API) + phone alerts
+
+There is **no way to plug into DraftKings directly** — DK has no public odds
+API and no bet-placement API, and its Terms of Service prohibit scraping and
+automated betting. The legitimate route is a licensed odds aggregator, **The
+Odds API** (the-odds-api.com, free tier ~500 requests/month), which resells
+DraftKings' posted lines. `odds_feed.py` reads those lines and pushes a phone
+alert; **you place the bet yourself in the DraftKings app.**
+
+```bash
+export ODDS_API_KEY=your_free_key            # from the-odds-api.com
+export NTFY_TOPIC=edge-signals-7f3a9c        # a secret string only you know
+python3 monitor_tennis_live.py               # prints tennis sport_keys to pick
+export ODDS_SPORT_KEY=tennis_atp_...         # pick one it printed
+export PLAYER_A="Carlos Alcaraz" PLAYER_B="Jannik Sinner"
+python3 monitor_tennis_live.py               # now it polls + alerts
+```
+
+Install the **ntfy** app (iOS/Android), Subscribe to your `NTFY_TOPIC`, and
+alerts land on your phone. No account or purchase needed. (`notify_pushover`
+is included as a fallback.)
+
+Two honest limits of this setup:
+- **Match state is still yours.** Odds APIs give prices, not the live score or
+  the rolling serve% that is your actual edge. Keep the signal object current
+  as you watch (see `update_from_your_feed` in the example).
+- **Quota.** One odds fetch = 1 request; polling every 30s drains the free tier
+  in ~4 hours. Use `POLL_SECONDS=90+` and only while your match is live —
+  `client.remaining_requests` is printed after each poll.
+
+> The **web app** (the hosted artifact) can't do any of this: its sandbox
+> blocks all outbound network calls by design, so auto-odds only works in this
+> Python version running on your own machine.
+
 ## What's intentionally not here
 
-- No live odds API integration — wire your own feed into `live_monitor.py`'s
-  `fetch_state_fn` / `fetch_odds_fn` (see the TODO markers).
-- No backtesting framework, no UI. This is a library, not an app.
+- No bet placement — impossible/against ToS on DraftKings; alerts only.
+- No backtesting framework. Separate task if you want one.
+- No per-PA "single" prop auto-fetch — that micro-market generally isn't
+  exposed by odds APIs (or DK's API-less feed), so the baseball line stays
+  manual entry in the app for now.
 
 > Feed these models rolling, current, context-adjusted inputs. The math is only
 > as good as the numbers you give it.
